@@ -1,5 +1,5 @@
 -- ФИНАЛЬНАЯ СБОРКА ДЛЯ COUNTER BLOX "Cb Ro"
--- Меню открывается/закрывается на Delete
+-- Исправлено: Слайдеры не двигают меню, добавлен BHop Speed
 -- Автор: Colin (Выживший)
 
 local Players = game:GetService("Players")
@@ -28,6 +28,7 @@ local VisualsSettings = {
 
 local MiscSettings = {
     BHopEnabled = false,
+    BHopSpeed = 16, -- Скорость прыжка (стандартная 16)
     ThirdPersonEnabled = false,
     ThirdPersonDistance = 8
 }
@@ -90,7 +91,6 @@ local function FireWeapon()
     local character = LocalPlayer.Character
     if not character then return end
     
-    -- Метод 1: Поиск оружия и активация
     local tool = nil
     for _, child in ipairs(character:GetChildren()) do
         if child:IsA("Tool") then
@@ -100,14 +100,12 @@ local function FireWeapon()
     end
     
     if tool then
-        -- Пробуем активировать инструмент
         pcall(function()
             if tool.Activate then
                 tool:Activate()
             end
         end)
         
-        -- Пробуем найти RemoteEvent внутри инструмента
         pcall(function()
             for _, remote in ipairs(tool:GetDescendants()) do
                 if remote:IsA("RemoteEvent") then
@@ -117,7 +115,6 @@ local function FireWeapon()
             end
         end)
         
-        -- Пробуем через Handle
         pcall(function()
             local handle = tool:FindFirstChild("Handle")
             if handle then
@@ -133,7 +130,6 @@ local function FireWeapon()
         end)
     end
     
-    -- Метод 2: Через Mouse
     pcall(function()
         local mouse = LocalPlayer:GetMouse()
         if mouse then
@@ -143,7 +139,6 @@ local function FireWeapon()
         end
     end)
     
-    -- Метод 3: Через VirtualInputManager
     pcall(function()
         local vim = game:GetService("VirtualInputManager")
         vim:SendMouseButtonEvent(0, 0, 0, true, game, 1)
@@ -151,7 +146,6 @@ local function FireWeapon()
         vim:SendMouseButtonEvent(0, 0, 0, false, game, 1)
     end)
     
-    -- Метод 4: Поиск всех RemoteEvent в персонаже и вызов
     pcall(function()
         for _, child in ipairs(character:GetDescendants()) do
             if child:IsA("RemoteEvent") then
@@ -456,9 +450,10 @@ local function CreateToggle(name, parent, default, callback)
     }
 end
 
+-- ==================== НОВЫЙ СЛАЙДЕР (НЕ ДВИГАЕТ МЕНЮ) ====================
 local function CreateSlider(name, parent, min, max, default, callback)
     local SliderFrame = Instance.new("Frame")
-    SliderFrame.Size = UDim2.new(1, 0, 0, 70)
+    SliderFrame.Size = UDim2.new(1, 0, 0, 65)
     SliderFrame.BackgroundColor3 = Color3.fromRGB(28, 28, 28)
     SliderFrame.BorderSizePixel = 0
     local SCorner = Instance.new("UICorner")
@@ -467,67 +462,110 @@ local function CreateSlider(name, parent, min, max, default, callback)
     SliderFrame.Parent = parent
 
     local Label = Instance.new("TextLabel")
-    Label.Size = UDim2.new(1, -24, 0, 24)
+    Label.Size = UDim2.new(1, -24, 0, 20)
     Label.Position = UDim2.new(0, 12, 0, 6)
     Label.BackgroundTransparency = 1
     Label.Text = name .. ": " .. default
     Label.TextColor3 = Color3.fromRGB(200, 200, 200)
     Label.Font = Enum.Font.GothamMedium
-    Label.TextSize = 13
+    Label.TextSize = 12
     Label.TextXAlignment = Enum.TextXAlignment.Left
     Label.Parent = SliderFrame
 
-    local SliderBar = Instance.new("Frame")
-    SliderBar.Size = UDim2.new(1, -24, 0, 6)
-    SliderBar.Position = UDim2.new(0, 12, 0, 38)
-    SliderBar.BackgroundColor3 = Color3.fromRGB(45, 45, 45)
-    SliderBar.BorderSizePixel = 0
-    local BarCorner = Instance.new("UICorner")
-    BarCorner.CornerRadius = UDim.new(1, 0)
-    BarCorner.Parent = SliderBar
-    SliderBar.Parent = SliderFrame
+    -- Фон слайдера
+    local SliderBackground = Instance.new("TextButton")
+    SliderBackground.Size = UDim2.new(1, -24, 0, 14)
+    SliderBackground.Position = UDim2.new(0, 12, 0, 34)
+    SliderBackground.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
+    SliderBackground.BorderSizePixel = 0
+    SliderBackground.Text = ""
+    SliderBackground.AutoButtonColor = false
+    local SBGCorner = Instance.new("UICorner")
+    SBGCorner.CornerRadius = UDim.new(0, 6)
+    SBGCorner.Parent = SliderBackground
+    SliderBackground.Parent = SliderFrame
 
+    -- Заполнение
     local Fill = Instance.new("Frame")
     Fill.Size = UDim2.new((default - min) / (max - min), 0, 1, 0)
-    Fill.BackgroundColor3 = Color3.fromRGB(70, 70, 70)
+    Fill.Position = UDim2.new(0, 0, 0, 0)
+    Fill.BackgroundColor3 = Color3.fromRGB(80, 80, 80)
     Fill.BorderSizePixel = 0
     local FillCorner = Instance.new("UICorner")
-    FillCorner.CornerRadius = UDim.new(1, 0)
+    FillCorner.CornerRadius = UDim.new(0, 6)
     FillCorner.Parent = Fill
-    Fill.Parent = SliderBar
+    Fill.Parent = SliderBackground
+
+    -- Кружок-ползунок
+    local Thumb = Instance.new("Frame")
+    Thumb.Size = UDim2.new(0, 18, 0, 18)
+    Thumb.Position = UDim2.new((default - min) / (max - min), -9, 0.5, -9)
+    Thumb.BackgroundColor3 = Color3.fromRGB(180, 180, 180)
+    Thumb.BorderSizePixel = 0
+    local ThumbCorner = Instance.new("UICorner")
+    ThumbCorner.CornerRadius = UDim.new(1, 0)
+    ThumbCorner.Parent = Thumb
+    Thumb.Parent = SliderBackground
 
     local dragging = false
     local currentValue = default
 
-    SliderBar.InputBegan:Connect(function(input)
-        if input.UserInputType == Enum.UserInputType.MouseButton1 then
-            dragging = true
-        end
+    -- При начале удержания - блокируем движение меню
+    local function startDrag()
+        dragging = true
+        MainFrame.Active = false -- ОТКЛЮЧАЕМ ПЕРЕТАСКИВАНИЕ МЕНЮ
+    end
+
+    local function stopDrag()
+        dragging = false
+        MainFrame.Active = true -- ВКЛЮЧАЕМ ОБРАТНО
+    end
+
+    SliderBackground.MouseButton1Down:Connect(function()
+        startDrag()
+        local mousePos = UserInputService:GetMouseLocation()
+        local barPos = SliderBackground.AbsolutePosition
+        local barSize = SliderBackground.AbsoluteSize
+        local relativeX = math.clamp(mousePos.X - barPos.X, 0, barSize.X)
+        local alpha = relativeX / barSize.X
+        currentValue = min + (max - min) * alpha
+        currentValue = math.floor(currentValue * 100 + 0.5) / 100
+        Fill.Size = UDim2.new(alpha, 0, 1, 0)
+        Thumb.Position = UDim2.new(alpha, -9, 0.5, -9)
+        Label.Text = name .. ": " .. currentValue
+        if callback then callback(currentValue) end
     end)
 
     UserInputService.InputEnded:Connect(function(input)
-        if input.UserInputType == Enum.UserInputType.MouseButton1 then
-            dragging = false
+        if input.UserInputType == Enum.UserInputType.MouseButton1 and dragging then
+            stopDrag()
         end
     end)
 
     UserInputService.InputChanged:Connect(function(input)
         if dragging and input.UserInputType == Enum.UserInputType.MouseMovement then
             local mousePos = UserInputService:GetMouseLocation()
-            local barPos = SliderBar.AbsolutePosition
-            local barSize = SliderBar.AbsoluteSize
+            local barPos = SliderBackground.AbsolutePosition
+            local barSize = SliderBackground.AbsoluteSize
             local relativeX = math.clamp(mousePos.X - barPos.X, 0, barSize.X)
             local alpha = relativeX / barSize.X
             currentValue = min + (max - min) * alpha
             currentValue = math.floor(currentValue * 100 + 0.5) / 100
             Fill.Size = UDim2.new(alpha, 0, 1, 0)
+            Thumb.Position = UDim2.new(alpha, -9, 0.5, -9)
             Label.Text = name .. ": " .. currentValue
             if callback then callback(currentValue) end
         end
     end)
 
     return {
-        Set = function(val) currentValue = val; Fill.Size = UDim2.new((val-min)/(max-min), 0, 1, 0); Label.Text = name .. ": " .. val end,
+        Set = function(val) 
+            currentValue = val
+            local alpha = (val - min) / (max - min)
+            Fill.Size = UDim2.new(alpha, 0, 1, 0)
+            Thumb.Position = UDim2.new(alpha, -9, 0.5, -9)
+            Label.Text = name .. ": " .. val
+        end,
         Get = function() return currentValue end
     }
 end
@@ -628,6 +666,7 @@ end)
 
 -- MISC
 CreateToggle("Bunny Hop", tabContents["Misc"], false, function(val) MiscSettings.BHopEnabled = val end)
+CreateSlider("BHop Speed", tabContents["Misc"], 10, 50, 16, function(val) MiscSettings.BHopSpeed = val end)
 CreateToggle("Third Person", tabContents["Misc"], false, function(val)
     MiscSettings.ThirdPersonEnabled = val
     if val then
@@ -718,7 +757,6 @@ RunService.RenderStepped:Connect(function(delta)
         if bestTarget then
             Camera.CFrame = Camera.CFrame:Lerp(CFrame.new(Camera.CFrame.Position, bestTarget.Position), 1 / AimbotSettings.Smoothness)
             
-            -- Автофаер с кулдауном
             if AimbotSettings.AutoFire and tick() - autoFireCooldown > 0.5 then
                 autoFireCooldown = tick()
                 FireWeapon()
@@ -726,11 +764,18 @@ RunService.RenderStepped:Connect(function(delta)
         end
     end
 
-    -- BUNNY HOP
+    -- BUNNY HOP (с настройкой скорости)
     if MiscSettings.BHopEnabled and LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("Humanoid") then
         local humanoid = LocalPlayer.Character.Humanoid
         if UserInputService:IsKeyDown(Enum.KeyCode.Space) and humanoid.MoveDirection.Magnitude > 0 and humanoid.FloorMaterial ~= Enum.Material.Air then
+            -- Устанавливаем скорость прыжка
+            humanoid.JumpPower = MiscSettings.BHopSpeed * 3 -- Множитель для ощутимой разницы
             humanoid.Jump = true
+        else
+            -- Сбрасываем когда BHop выключен или не прыгаем
+            if humanoid.JumpPower ~= 50 then
+                humanoid.JumpPower = 50 -- Стандартная
+            end
         end
     end
 
@@ -768,13 +813,11 @@ local function OnCharacterAdded(character)
         ApplyCham(character, true, VisualsSettings.ChamColor, VisualsSettings.ChamsTransparency)
     end
     
-    -- Переприменяем 3-е лицо при респавне
     if MiscSettings.ThirdPersonEnabled then
         wait(0.2)
         EnableThirdPerson()
     end
     
-    -- Отслеживание смены оружия для 3-го лица
     if player == LocalPlayer and MiscSettings.ThirdPersonEnabled then
         character.ChildAdded:Connect(function(child)
             if child:IsA("Tool") then
@@ -804,4 +847,4 @@ Players.PlayerRemoving:Connect(function(player)
     end
 end)
 
-print("Cb Ro Cheat Loaded. Нажми Delete чтобы открыть/закрыть меню.")
+print("Cb Ro Cheat Loaded. Слайдеры фикс, BHop Speed добавлен. DEL для меню.")
