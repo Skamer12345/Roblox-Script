@@ -1,5 +1,6 @@
 -- ФИНАЛЬНАЯ СБОРКА ДЛЯ COUNTER BLOX "Cb Ro"
--- Исправлено: Слайдеры не двигают меню, добавлен BHop Speed
+-- Убраны нерабочие: Silent Aim, Desync, Fake Angle
+-- Оставлены рабочие: Aimbot, Wallbang, AutoFire, ESP, Chams, BHop, 3P, Anti-Aim, Jitter
 -- Автор: Colin (Выживший)
 
 local Players = game:GetService("Players")
@@ -28,7 +29,7 @@ local VisualsSettings = {
 
 local MiscSettings = {
     BHopEnabled = false,
-    BHopSpeed = 16, -- Скорость прыжка (стандартная 16)
+    BHopSpeed = 16,
     ThirdPersonEnabled = false,
     ThirdPersonDistance = 8
 }
@@ -37,7 +38,9 @@ local AntiAimSettings = {
     Enabled = false,
     Pitch = 0,
     Yaw = 180,
-    SpinSpeed = 10
+    SpinSpeed = 10,
+    Jitter = false,
+    JitterRange = 45
 }
 
 -- Хранилища ESP
@@ -49,6 +52,10 @@ local autoFireCooldown = 0
 -- Для статичного 3-го лица
 local thirdPersonActive = false
 local thirdPersonConnection = nil
+
+-- Для Anti-Aim Jitter
+local jitterOffset = 0
+local jitterDirection = 1
 
 -- ==================== УТИЛИТЫ ====================
 local function IsTeammate(player)
@@ -114,20 +121,6 @@ local function FireWeapon()
                 end
             end
         end)
-        
-        pcall(function()
-            local handle = tool:FindFirstChild("Handle")
-            if handle then
-                local args = {
-                    [1] = "MouseButton1Click",
-                    [2] = true
-                }
-                local weaponSystem = game:GetService("ReplicatedStorage"):FindFirstChild("WeaponSystem")
-                if weaponSystem then
-                    weaponSystem:FireServer(unpack(args))
-                end
-            end
-        end)
     end
     
     pcall(function()
@@ -144,15 +137,6 @@ local function FireWeapon()
         vim:SendMouseButtonEvent(0, 0, 0, true, game, 1)
         wait(0.05)
         vim:SendMouseButtonEvent(0, 0, 0, false, game, 1)
-    end)
-    
-    pcall(function()
-        for _, child in ipairs(character:GetDescendants()) do
-            if child:IsA("RemoteEvent") then
-                child:FireServer("Shoot", true)
-                break
-            end
-        end
     end)
 end
 
@@ -258,8 +242,8 @@ ScreenGui.Parent = game.CoreGui
 ScreenGui.Name = "CbRo_Cheat"
 
 local MainFrame = Instance.new("Frame")
-MainFrame.Size = UDim2.new(0, 580, 0, 420)
-MainFrame.Position = UDim2.new(0.5, -290, 0.5, -210)
+MainFrame.Size = UDim2.new(0, 580, 0, 460)
+MainFrame.Position = UDim2.new(0.5, -290, 0.5, -230)
 MainFrame.BackgroundColor3 = Color3.fromRGB(18, 18, 18)
 MainFrame.BorderSizePixel = 0
 MainFrame.ClipsDescendants = true
@@ -355,7 +339,7 @@ local function CreateTab(name, index)
     TabContent.BackgroundTransparency = 1
     TabContent.ScrollBarThickness = 4
     TabContent.ScrollBarImageColor3 = Color3.fromRGB(80, 80, 80)
-    TabContent.CanvasSize = UDim2.new(0, 0, 0, 600)
+    TabContent.CanvasSize = UDim2.new(0, 0, 0, 800)
     TabContent.Visible = false
     TabContent.Parent = ContentFrame
 
@@ -450,7 +434,7 @@ local function CreateToggle(name, parent, default, callback)
     }
 end
 
--- ==================== НОВЫЙ СЛАЙДЕР (НЕ ДВИГАЕТ МЕНЮ) ====================
+-- ==================== СЛАЙДЕР (НЕ ДВИГАЕТ МЕНЮ) ====================
 local function CreateSlider(name, parent, min, max, default, callback)
     local SliderFrame = Instance.new("Frame")
     SliderFrame.Size = UDim2.new(1, 0, 0, 65)
@@ -472,7 +456,6 @@ local function CreateSlider(name, parent, min, max, default, callback)
     Label.TextXAlignment = Enum.TextXAlignment.Left
     Label.Parent = SliderFrame
 
-    -- Фон слайдера
     local SliderBackground = Instance.new("TextButton")
     SliderBackground.Size = UDim2.new(1, -24, 0, 14)
     SliderBackground.Position = UDim2.new(0, 12, 0, 34)
@@ -485,7 +468,6 @@ local function CreateSlider(name, parent, min, max, default, callback)
     SBGCorner.Parent = SliderBackground
     SliderBackground.Parent = SliderFrame
 
-    -- Заполнение
     local Fill = Instance.new("Frame")
     Fill.Size = UDim2.new((default - min) / (max - min), 0, 1, 0)
     Fill.Position = UDim2.new(0, 0, 0, 0)
@@ -496,7 +478,6 @@ local function CreateSlider(name, parent, min, max, default, callback)
     FillCorner.Parent = Fill
     Fill.Parent = SliderBackground
 
-    -- Кружок-ползунок
     local Thumb = Instance.new("Frame")
     Thumb.Size = UDim2.new(0, 18, 0, 18)
     Thumb.Position = UDim2.new((default - min) / (max - min), -9, 0.5, -9)
@@ -510,15 +491,14 @@ local function CreateSlider(name, parent, min, max, default, callback)
     local dragging = false
     local currentValue = default
 
-    -- При начале удержания - блокируем движение меню
     local function startDrag()
         dragging = true
-        MainFrame.Active = false -- ОТКЛЮЧАЕМ ПЕРЕТАСКИВАНИЕ МЕНЮ
+        MainFrame.Active = false
     end
 
     local function stopDrag()
         dragging = false
-        MainFrame.Active = true -- ВКЛЮЧАЕМ ОБРАТНО
+        MainFrame.Active = true
     end
 
     SliderBackground.MouseButton1Down:Connect(function()
@@ -666,7 +646,7 @@ end)
 
 -- MISC
 CreateToggle("Bunny Hop", tabContents["Misc"], false, function(val) MiscSettings.BHopEnabled = val end)
-CreateSlider("BHop Speed", tabContents["Misc"], 10, 50, 16, function(val) MiscSettings.BHopSpeed = val end)
+CreateSlider("BHop Speed", tabContents["Misc"], 16, 50, 16, function(val) MiscSettings.BHopSpeed = val end)
 CreateToggle("Third Person", tabContents["Misc"], false, function(val)
     MiscSettings.ThirdPersonEnabled = val
     if val then
@@ -687,6 +667,8 @@ end)
 
 -- ANTI-AIM
 CreateToggle("Enable Anti-Aim", tabContents["Anti-Aim"], false, function(val) AntiAimSettings.Enabled = val end)
+CreateToggle("Jitter", tabContents["Anti-Aim"], false, function(val) AntiAimSettings.Jitter = val end)
+CreateSlider("Jitter Range", tabContents["Anti-Aim"], 5, 90, 45, function(val) AntiAimSettings.JitterRange = val end)
 CreateSlider("Pitch", tabContents["Anti-Aim"], -89, 89, 0, function(val) AntiAimSettings.Pitch = val end)
 CreateSlider("Yaw", tabContents["Anti-Aim"], -180, 180, 180, function(val) AntiAimSettings.Yaw = val end)
 CreateSlider("Spin Speed", tabContents["Anti-Aim"], 0, 50, 10, function(val) AntiAimSettings.SpinSpeed = val end)
@@ -764,26 +746,42 @@ RunService.RenderStepped:Connect(function(delta)
         end
     end
 
-    -- BUNNY HOP (с настройкой скорости)
-    if MiscSettings.BHopEnabled and LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("Humanoid") then
+    -- BUNNY HOP (WalkSpeed реально меняется)
+    if LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("Humanoid") then
         local humanoid = LocalPlayer.Character.Humanoid
-        if UserInputService:IsKeyDown(Enum.KeyCode.Space) and humanoid.MoveDirection.Magnitude > 0 and humanoid.FloorMaterial ~= Enum.Material.Air then
-            -- Устанавливаем скорость прыжка
-            humanoid.JumpPower = MiscSettings.BHopSpeed * 3 -- Множитель для ощутимой разницы
-            humanoid.Jump = true
+        
+        if MiscSettings.BHopEnabled then
+            humanoid.WalkSpeed = MiscSettings.BHopSpeed
+            
+            if UserInputService:IsKeyDown(Enum.KeyCode.Space) and humanoid.MoveDirection.Magnitude > 0 and humanoid.FloorMaterial ~= Enum.Material.Air then
+                humanoid.JumpPower = MiscSettings.BHopSpeed * 3
+                humanoid.Jump = true
+            end
         else
-            -- Сбрасываем когда BHop выключен или не прыгаем
+            if humanoid.WalkSpeed ~= 16 then
+                humanoid.WalkSpeed = 16
+            end
             if humanoid.JumpPower ~= 50 then
-                humanoid.JumpPower = 50 -- Стандартная
+                humanoid.JumpPower = 50
             end
         end
     end
 
-    -- ANTI AIM
+    -- ANTI AIM (Jitter рабочий)
     if AntiAimSettings.Enabled and LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart") then
         local root = LocalPlayer.Character.HumanoidRootPart
+        
+        if AntiAimSettings.Jitter then
+            jitterOffset = jitterOffset + (5 * jitterDirection)
+            if math.abs(jitterOffset) >= AntiAimSettings.JitterRange then
+                jitterDirection = jitterDirection * -1
+            end
+        else
+            jitterOffset = 0
+        end
+        
         local pitch = math.rad(AntiAimSettings.Pitch)
-        local yaw = math.rad(AntiAimSettings.Yaw + (tick() * AntiAimSettings.SpinSpeed * 10 % 360))
+        local yaw = math.rad(AntiAimSettings.Yaw + (tick() * AntiAimSettings.SpinSpeed * 10 % 360) + jitterOffset)
         local cf = CFrame.new(root.Position) * CFrame.Angles(pitch, yaw, 0)
         root.CFrame = cf
     end
@@ -818,17 +816,23 @@ local function OnCharacterAdded(character)
         EnableThirdPerson()
     end
     
-    if player == LocalPlayer and MiscSettings.ThirdPersonEnabled then
-        character.ChildAdded:Connect(function(child)
-            if child:IsA("Tool") then
-                wait(0.05)
-                pcall(function()
-                    LocalPlayer.CameraMode = Enum.CameraMode.Classic
-                    LocalPlayer.CameraMaxZoomDistance = MiscSettings.ThirdPersonDistance
-                    LocalPlayer.CameraMinZoomDistance = MiscSettings.ThirdPersonDistance
-                end)
-            end
-        end)
+    if player == LocalPlayer then
+        if MiscSettings.BHopEnabled and character:FindFirstChild("Humanoid") then
+            character.Humanoid.WalkSpeed = MiscSettings.BHopSpeed
+        end
+        
+        if MiscSettings.ThirdPersonEnabled then
+            character.ChildAdded:Connect(function(child)
+                if child:IsA("Tool") then
+                    wait(0.05)
+                    pcall(function()
+                        LocalPlayer.CameraMode = Enum.CameraMode.Classic
+                        LocalPlayer.CameraMaxZoomDistance = MiscSettings.ThirdPersonDistance
+                        LocalPlayer.CameraMinZoomDistance = MiscSettings.ThirdPersonDistance
+                    end)
+                end
+            end)
+        end
     end
 end
 
@@ -847,4 +851,4 @@ Players.PlayerRemoving:Connect(function(player)
     end
 end)
 
-print("Cb Ro Cheat Loaded. Слайдеры фикс, BHop Speed добавлен. DEL для меню.")
+print("Cb Ro Cheat Loaded. Стабильная версия. DEL для меню.")
